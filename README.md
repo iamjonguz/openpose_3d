@@ -1,6 +1,6 @@
 This is the repo for my bachelor thesis.
 
-<b>Short description</b>
+<b>Short description</b></br>
 Openpose is a system for estimating human keypoints from video streams, pictures etc.
 
 This thesis investigates the possibilities for how you can with the help of a 3D camera, in this case Intel Realsense create a system that can estimate human poses in 3D.
