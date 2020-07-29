@@ -14,6 +14,7 @@ from cam import VideoRecorder
 
 from depth_table import create_depth_table
 
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 if platform == "win32":
     # Change these variables to point to the correct folder (Release/x64 etc.)
@@ -46,7 +47,6 @@ class OpenPose:
 
         # Just loaded from code, need a better solution
         self.depth_info = create_depth_table()
-
 
     def record_estimation_sequence(self):
         '''
