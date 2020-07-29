@@ -21,6 +21,8 @@ class GraphDrawer(pg.GraphicsWindow):
     def __init__(self, from_file=False, path_to_csv=None):
         super(GraphDrawer, self).__init__(title='Pose estimation')
 
+        self.resize(1000,800)
+
         self.frame_number = 0
         self.from_file = from_file
         self.poses = poses(path_to_csv)
@@ -43,7 +45,7 @@ class GraphDrawer(pg.GraphicsWindow):
         self.window = gl.GLViewWidget()
         
         # Uncomment to see the different axes
-        '''
+        
         gx = gl.GLGridItem()
         gy = gl.GLGridItem()
         gz = gl.GLGridItem()
@@ -55,14 +57,10 @@ class GraphDrawer(pg.GraphicsWindow):
         gy.translate(0, -10, 0) 
         gz.translate(0, 0, -10)
 
-        gx.scale(0.2, 0.1, 0.1)
-        gy.scale(0.2, 0.1, 0.1)
-        gz.scale(0.2, 0.1, 0.1)
-
         self.window.addItem(gx) 
         self.window.addItem(gy) 
         self.window.addItem(gz) 
-        '''
+        
  
         if self.from_file:
             verts = self.poses[self.frame_number]
@@ -113,7 +111,7 @@ class GraphDrawer(pg.GraphicsWindow):
         gv.sizeHint = lambda: pg.QtCore.QSize(100, 100)
         self.window.sizeHint = lambda: pg.QtCore.QSize(100, 100)
         self.window.setSizePolicy(gv.sizePolicy()) 
-        self.window.setCameraPosition(distance=15, elevation=12)
+        self.window.setCameraPosition(distance=15, elevation=20)
 
 
     def update(self):
@@ -198,8 +196,8 @@ class GraphDrawer(pg.GraphicsWindow):
 
 
 if __name__ == "__main__":
-    app = QtGui.QApplication(sys.argv)
-    g = GraphDrawer(True, 'scripts/original.csv')
+    app = QtGui.QApplication(sys.argv) 
+    g = GraphDrawer(True, 'scripts/rolling_mean.csv')
     #g.start()
     
     try:

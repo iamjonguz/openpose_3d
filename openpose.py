@@ -44,107 +44,101 @@ class OpenPose:
         self.datum = op.Datum()
         self.opWrapper.start()
 
+        # Just loaded from code, need a better solution
         self.depth_info = create_depth_table()
 
 
     def record_estimation_sequence(self):
+        '''
+        Will record a sequence of frames and for each frame estimate the poses in 3D.
+
+        Each frame will be saved as a picture together with a json file containing
+        information about keypoints. 
+        '''
         frame_number = 0
         time.sleep(3)
         while True:
             img_name = f'img{frame_number}.jpg'
-            frame, img = self.estimate_3d_picture(recording=True, frame_number=frame_number, img_name=img_name)
+            _, img = self.estimate_3d_picture(recording=True, frame_number=frame_number, img_name=img_name)
             cv2.imwrite(f'img/{img_name}', img)
             frame_number+=1
 
-    def estimate_3d_picture(self, color_pic=None, depth=None, recording=False, frame_number=None, img_name=None):
-        
+    def estimate_3d_picture(self, recording=False, frame_number=None, img_name=None, use_table_data=True):
+        '''
+        Will estimate the pose in 3D, by first estimating the 2D poses and then getting the 3D poses with the help 
+        of the 3D data from the 3D camera. 
+
+        Returns the estimated 3D keypoints and the picture of the estimation. 
+        '''
+
         # Picture taken from Intel Realsense Camera
-        color_pic, depth = self.vr.record_frame()
+        color_pic, depth_data = self.vr.record_frame()
         
         self.datum.cvInputData = color_pic
         self.opWrapper.emplaceAndPop([self.datum])
 
-        kp = self.datum.poseKeypoints[0]
+        keypoints_2d = self.datum.poseKeypoints[0]
 
-        d = self.estimate_depth(kp, depth)
-        kp_object = self.create_json(kp, d, save=recording, frame_number=frame_number, img_name=img_name)
+        keypoints_depth = self.get_depth_from_camera(keypoints_2d, depth_data)
 
-        # Used for printing
-        if recording == False:
-            a = kp_object['keypoints']
-            kp_list = []
-            for k in a: 
-                kp_list.append((a[k][0], 300*a[k][2], -1*a[k][1]))
-            return np.array(kp_list)
-        else:
-            return kp_object, color_pic
+        if use_table_data:
+            keypoints_depth = self.estimate_depth_from_table(keypoints_depth)
 
+        estimated_keypoints_3d = self.create_json(keypoints_2d, keypoints_depth, save=recording, frame_number=frame_number, img_name=img_name)
 
-    def similarity(self, l1, l2):
+        return estimated_keypoints_3d, color_pic
+
+    def get_depth_from_camera(self, kp, depth):
         '''
-        Will compare two depth frames. For each value in in the depth list it compare to a frame from the saved data.
-        It does this by adding up all the similarites for each keypoint and take the mean value out of that. 
-        '''
-        tmp = 0
-
-        for i,j in zip(l1,l2):
-
-            if i == 0 or j == 0:
-                tmp += 0
-            elif i > j:
-                tmp += j/i
-            else:
-                tmp += i/j
-
-        return tmp/len(l1)
-
-
-    def estimate_depth(self, kp, depth):
-        '''
-        An extremly ugly and temporary solution to find the best depth match. For each frame estimation it will 
-        loop through all saved valid frames and find the best match. Need a better solution for this. 
-
-        Lookup, maybe using hashes? 
+        Will return the raw depth data from the camera.
         '''
         depth_list = []
-        current_best_sim = 0
-        ind = 0
-
+         
+        # Getting the depths of the estimated keypoints
         for k in kp:
             depth_list.append(depth.get_distance(k[0], k[1]))
 
-        #print(depth_list)
+        return depth_list
+
+    def estimate_depth_from_table(self, depth_list):
+        '''
+        Will from raw depth data pick the best depth frame from a table containg premade depth frames. 
+
+        It will compare each frame in the frame table with recorded depth frame, using euclidian distance. 
+        The frame from the table with the least distance to the recorded frame will be chosen. 
+        '''
+
+        current_best_dist = 0
+        ind = 0
 
         for i,dl in enumerate(self.depth_info):
-            sim = self.similarity(depth_list, dl)
 
-            if sim > current_best_sim:
-                current_best_sim = sim
+            # Euclidian distance
+            dist = np.linalg.norm(np.array(depth_list)-np.array(dl))
+
+            if dist > current_best_dist:
+                current_best_dist = dist
                 ind = i
         
-        print(current_best_sim)
-
         return self.depth_info[ind]
-        #return depth_list
 
-
-    # Working
-    def create_json(self, pose_keypoints, depth, save=False, img_name=None, frame_number=None):
-
+    def create_json(self, pose_keypoints, depth, save=False, img_name=None, frame_number=None, path='img'):
+        '''
+        Will translate the data into more suitable data for printing. If save=true it will 
+        save a json file with the keypoint information
+        '''
         kp_dict = {}
 
         for ind, kp in enumerate(pose_keypoints):
             kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
-        
         data = {}
          # Should be the name of the image so they can get linked together 
         data['img_url'] = img_name
         data['frame'] = frame_number
         data['keypoints'] = kp_dict
             
-
         if save:
-            with open(f'img/img{frame_number}.json', 'w', encoding='utf-8') as output:
+            with open(f'{path}/img{frame_number}.json', 'w', encoding='utf-8') as output:
                 json.dump(data, output, ensure_ascii=False, indent=4)
 
         return data
