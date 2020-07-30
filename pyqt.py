@@ -19,6 +19,10 @@ from pose_from_csv import poses
 class GraphDrawer(pg.GraphicsWindow):
 
     def __init__(self, from_file=False, path_to_csv=None):
+        '''
+        Will initiate the graph and draw the first frame
+        '''
+        
         super(GraphDrawer, self).__init__(title='Pose estimation')
 
         self.resize(1000,800)
@@ -31,8 +35,9 @@ class GraphDrawer(pg.GraphicsWindow):
             try:
                 self.op = OpenPose()
             except RuntimeError:
-                print('Try to connect a device!')
+                print('Connect a camera!')
 
+        # Keypoint connections
         self.connection = [
             [4, 3], [3, 2], [2, 1], [7, 6], [6, 5],
             [5, 1], [17, 15], [15, 0], [0, 16], [16, 18],
@@ -44,8 +49,9 @@ class GraphDrawer(pg.GraphicsWindow):
         # ------------------------------------------ 3D graph ------------------------------------------
         self.window = gl.GLViewWidget()
         
-        # Uncomment to see the different axes
+        # Uncomment to see the axes
         
+        '''
         gx = gl.GLGridItem()
         gy = gl.GLGridItem()
         gz = gl.GLGridItem()
@@ -60,19 +66,16 @@ class GraphDrawer(pg.GraphicsWindow):
         self.window.addItem(gx) 
         self.window.addItem(gy) 
         self.window.addItem(gz) 
-        
+        '''
  
+        # Keypoints either loaded from file, or straight from the camera
         if self.from_file:
-            verts = self.poses[self.frame_number]
+            keypoints = self.poses[self.frame_number]
         else:
-            verts = self.op.estimate_3d_picture()
-
-        for i, p in enumerate(verts):
-            if p[2] > -0.2:
-                verts[i] = None
+            keypoints = self.op.estimate_3d_picture()
 
         self.points = gl.GLScatterPlotItem(
-                pos=verts,
+                pos=keypoints,
                 color=pg.glColor((0, 255, 0)),
                 size=10
             )
@@ -82,7 +85,7 @@ class GraphDrawer(pg.GraphicsWindow):
         for n, pts in enumerate(self.connection):
             try:
                 self.lines[n] = gl.GLLinePlotItem(
-                    pos=np.array([verts[pts[0]], verts[pts[1]]]),
+                    pos=np.array([keypoints[pts[0]], keypoints[pts[1]]]),
                     color=self.get_color(n), 
                     width=2,
                     antialias= True
@@ -92,7 +95,7 @@ class GraphDrawer(pg.GraphicsWindow):
                 print('That points was not found.')    
 
 
-        # ------------------------------------------ Image ------------------------------------------
+        # ------------------------------------------ Image printing ------------------------------------------
         img = cv2.imread(f'img/img{self.frame_number}.jpg')
               
         self.p1 = pg.ImageItem()
@@ -123,22 +126,23 @@ class GraphDrawer(pg.GraphicsWindow):
         try: 
             if self.from_file:
                 time.sleep(0.05)
-                k = self.poses[self.frame_number]
+                keypoints = self.poses[self.frame_number]
             else:
-                k = self.op.estimate_3d_picture()
+                keypoints = self.op.estimate_3d_picture()
 
-            # All the points with bad values will be set to none.
-            for i, p in enumerate(k):
+            # All the keypoints that is not found will be set to none instead of 0. 
+            # This will make it so that the bad keypoints are not printed
+            for i, p in enumerate(keypoints):
                 if p[2] > -0.2:
-                    k[i] = None
+                    keypoints[i] = None
 
-            self.points.setData(pos=k)
+            self.points.setData(pos=keypoints)
 
             # Creating lines between keypoints
             for n, pts in enumerate(self.connection):
                 tmp = []
                 for p in pts:  
-                    tmp.append(k[p])
+                    tmp.append(keypoints[p])
                         
                 self.lines[n].setData(
                     pos=np.array(tmp)
@@ -157,12 +161,10 @@ class GraphDrawer(pg.GraphicsWindow):
         timer.start(frametime)
         self.start()
 
-    def picture(self):
-        time.sleep(2)
-        self.update()
-        self.start()
-
     def get_color(self, connection):
+        '''
+        Returns various colors for the different keypoints
+        '''
         if connection == 0: return pg.glColor(235, 235, 52)
         elif connection == 1: return pg.glColor(235, 174, 52)
         elif connection == 2: return pg.glColor(235, 128, 52)

@@ -136,13 +136,10 @@ class OpenPose:
         kp_dict = {}
         kp_list = []
 
-
-
         for ind, kp in enumerate(pose_keypoints):
             kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
             kp_list += kp_dict[str(ind)]
 
-        
         kp_list = np.array(kp_list).reshape(1, -1)
         if self.knn.predict(kp_list)[0]:
             print('occlusion')
@@ -154,7 +151,6 @@ class OpenPose:
         else:
             print('no occlusion')
          
-
         data = {}
 
         data['img_url'] = img_name

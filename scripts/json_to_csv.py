@@ -52,7 +52,7 @@ def rolling_mean():
         col = []
 
         for i in csv_reader:
-            rolling_windows = csv_reader[i].rolling(10)
+            rolling_windows = csv_reader[i].rolling(5)
             col.append(rolling_windows.mean())
 
         a = list(zip(col[0], col[1], col[2],col[3],col[4],col[5],col[6],col[7],col[8],col[9],col[10],col[11],col[12],col[13],col[14],col[15],col[16],col[17],col[18],col[19],col[20],
