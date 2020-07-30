@@ -30,7 +30,7 @@ def create_depth_table():
     depth_info = np.array([np.array(xi) for xi in original_recorded_depth])
 
     # Just some scalaras to make dummy data better for different distances from camera
-    scalars = [0.5, 0.57, 0.6, 0.7, 0.8, 0.9, 1]
+    scalars = [0.65]
 
     depth_matrix = []
 
@@ -40,5 +40,4 @@ def create_depth_table():
             depth_matrix.append(tmp)
 
     return depth_matrix 
-
 

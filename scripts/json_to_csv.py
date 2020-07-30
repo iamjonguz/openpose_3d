@@ -10,7 +10,6 @@ import numpy as np
 
 path_to_dir='../img'
 
-
 def json_to_csv():
     json_list = []
     img_dir = os.listdir(path_to_dir)
@@ -26,6 +25,7 @@ def json_to_csv():
                     flatten_dir[f'kp_{kp}_x'] = js['keypoints'][str(kp)][0]
                     flatten_dir[f'kp_{kp}_y'] = js['keypoints'][str(kp)][1]
                     flatten_dir[f'kp_{kp}_z'] = js['keypoints'][str(kp)][2]
+
                 json_list.append(flatten_dir)
 
     columns = ['kp_0_x', 'kp_0_y', 'kp_0_z', 'kp_1_x','kp_1_y','kp_1_z',
@@ -42,9 +42,7 @@ def json_to_csv():
                        'kp_22_x', 'kp_22_y', 'kp_22_z', 'kp_23_x','kp_23_y','kp_23_z',
                         'kp_24_x', 'kp_24_y', 'kp_24_z']
 
-    json_df = pd.DataFrame(json_list, columns=columns)
-    return json_df
-
+    return pd.DataFrame(json_list, columns=columns)
 
 def rolling_mean():
 
@@ -57,7 +55,6 @@ def rolling_mean():
             rolling_windows = csv_reader[i].rolling(10)
             col.append(rolling_windows.mean())
 
-  
         a = list(zip(col[0], col[1], col[2],col[3],col[4],col[5],col[6],col[7],col[8],col[9],col[10],col[11],col[12],col[13],col[14],col[15],col[16],col[17],col[18],col[19],col[20],
                 col[21], col[22],col[23],col[24],col[25],col[26],col[27],col[28],col[29],col[30],col[31],col[32],col[33],col[34],col[35],col[36],col[37],col[38],col[39],col[40],
                 col[41], col[42],col[43],col[44],col[45],col[46],col[47],col[48],col[49],col[50],col[51],col[52],col[53],col[54],col[55],col[56],col[57],col[58],col[59],col[60],
@@ -80,7 +77,6 @@ def rolling_mean():
 
         frame = pd.DataFrame(a, columns=columns)
         return frame
-
 
 if __name__ == "__main__":    
 

@@ -14,6 +14,8 @@ from cam import VideoRecorder
 
 from depth_table import create_depth_table
 
+from k_nearest import knn_classifier
+
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 if platform == "win32":
@@ -47,6 +49,9 @@ class OpenPose:
 
         # Just loaded from code, need a better solution
         self.depth_info = create_depth_table()
+        self.prev_depth = [1.8]*25
+
+        self.knn = knn_classifier('dataset/occlusion_data.csv')
 
     def record_estimation_sequence(self):
         '''
@@ -81,9 +86,6 @@ class OpenPose:
 
         keypoints_depth = self.get_depth_from_camera(keypoints_2d, depth_data)
 
-        if use_table_data:
-            keypoints_depth = self.estimate_depth_from_table(keypoints_depth)
-
         estimated_keypoints_3d = self.create_json(keypoints_2d, keypoints_depth, save=recording, frame_number=frame_number, img_name=img_name)
 
         return estimated_keypoints_3d, color_pic
@@ -91,13 +93,17 @@ class OpenPose:
     def get_depth_from_camera(self, kp, depth):
         '''
         Will return the raw depth data from the camera.
-        '''
+        ''' 
         depth_list = []
          
         # Getting the depths of the estimated keypoints
-        for k in kp:
-            depth_list.append(depth.get_distance(k[0], k[1]))
+        for i, k in enumerate(kp):
+            dist = depth.get_distance(k[0], k[1])
+            if dist == 0 and self.prev_depth[i] != 0:
+                dist = self.prev_depth[i]
+            depth_list.append(dist)
 
+        self.prev_depth = depth_list
         return depth_list
 
     def estimate_depth_from_table(self, depth_list):
@@ -128,15 +134,33 @@ class OpenPose:
         save a json file with the keypoint information
         '''
         kp_dict = {}
+        kp_list = []
+
+
 
         for ind, kp in enumerate(pose_keypoints):
             kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
+            kp_list += kp_dict[str(ind)]
+
+        
+        kp_list = np.array(kp_list).reshape(1, -1)
+        if self.knn.predict(kp_list)[0]:
+            print('occlusion')
+
+            depth = self.estimate_depth_from_table(depth)
+            
+            for ind, kp in enumerate(pose_keypoints):
+                kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
+        else:
+            print('no occlusion')
+         
+
         data = {}
-         # Should be the name of the image so they can get linked together 
+
         data['img_url'] = img_name
         data['frame'] = frame_number
         data['keypoints'] = kp_dict
-            
+
         if save:
             with open(f'{path}/img{frame_number}.json', 'w', encoding='utf-8') as output:
                 json.dump(data, output, ensure_ascii=False, indent=4)

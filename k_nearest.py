@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 
 from sklearn import linear_model, preprocessing
 
-from openpose import OpenPose
+#from openpose import OpenPose
 
 import numpy as np
 
@@ -36,7 +36,7 @@ def create_json_knn(pose_keypoints, frame_number, occlusion):
     data['occlusion'] = occlusion
     data['keypoints'] = kp_list
         
-    with open(f'dataset/json/occluded_test_data{frame_number}.json', 'w', encoding='utf-8') as output:
+    with open(f'dataset/json/none_occluded_data{frame_number}.json', 'w', encoding='utf-8') as output:
         json.dump(data, output, ensure_ascii=False, indent=4)
 
     return data
@@ -48,8 +48,8 @@ def create_dataset_knn(num_of_frames):
     frame_number = 0
     for i in range(num_of_frames):
         keypoints, image = op.estimate_3d_picture(use_table_data=False)
-        cv2.imwrite(f'dataset/img/occluded_test_data{frame_number}.jpg', image)
-        create_json_knn(keypoints['keypoints'], frame_number, True)
+        cv2.imwrite(f'dataset/img/none_occluded_data{frame_number}.jpg', image)
+        create_json_knn(keypoints['keypoints'], frame_number, False)
         
         print(f'Frame with number {frame_number} created...')
         
@@ -109,7 +109,7 @@ def test_dir(path_to_dir, knn):
         data = data['keypoints']
         data = np.array(data).reshape(1, -1)
 
-        print(knn.predict(data))
+        print(knn.predict(data)[0])
 
 def test_file(path_to_dir, knn):
  
@@ -123,15 +123,15 @@ def test_file(path_to_dir, knn):
 
 
 if __name__ == '__main__': 
-    #create_dataset_knn(20)
+    #create_dataset_knn(50)
     
     '''
     csv_frame = create_csv_knn()
     csv_frame.to_csv('dataset/occlusion_data.csv', index=False)
     '''
     
-    knn = knn_classifier('dataset/occlusion_data.csv')
-    test_dir('dataset/json/test/', knn)
+    #knn = knn_classifier('dataset/occlusion_data.csv')
+    #test_dir('dataset/json/', knn)
     
     '''
     with open('dataset/json/no_occlusion0.json', 'r') as f:
