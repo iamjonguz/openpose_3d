@@ -51,7 +51,6 @@ class OpenPose:
 
         # Just loaded from code, need a better solution
         self.depth_info = create_depth_table()
-        self.prev_depth = [1.8]*25
 
         self.knn = knn_classifier('data/training_data/occlusion_data.csv')
 
@@ -100,12 +99,9 @@ class OpenPose:
          
         # Getting the depths of the estimated keypoints
         for i, k in enumerate(kp):
-            dist = depth.get_distance(k[0], k[1])
-            if dist == 0 and self.prev_depth[i] != 0:
-                dist = self.prev_depth[i]
+            dist = depth.get_distance(k[0], k[1]) 
             depth_list.append(dist)
 
-        self.prev_depth = depth_list
         return depth_list
 
     def estimate_depth_from_table(self, depth_list):

@@ -39,5 +39,7 @@ elif arg == 'openpose_3d':
         print('Recording stopped.')
         create_csv()
         animation()
-
+elif arg == 'animation':
+    from animation.pyqt import animation
+    animation()
 

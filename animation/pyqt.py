@@ -101,7 +101,7 @@ class GraphDrawer(pg.GraphicsWindow):
 
 
         # ------------------------------------------ Image printing ------------------------------------------
-        img = cv2.imread(f'../data/recorded_sequences/img{self.frame_number}.jpg')
+        img = cv2.imread(dir_path + f'/../data/recorded_sequences/img{self.frame_number}.jpg')
               
         self.p1 = pg.ImageItem()
         self.p1.setImage(img)
@@ -125,7 +125,7 @@ class GraphDrawer(pg.GraphicsWindow):
     def update(self):
         self.frame_number +=1
 
-        img = cv2.imread(f'../data/recorded_sequences/img{self.frame_number}.jpg')
+        img = cv2.imread(dir_path + f'/../data/recorded_sequences/img{self.frame_number}.jpg')
         self.p1.setImage(img)
 
         try: 

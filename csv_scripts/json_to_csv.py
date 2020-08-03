@@ -44,7 +44,7 @@ def json_to_csv(path_to_dir=dir_path + '/../data/recorded_sequences/'):
 
     return pd.DataFrame(json_list, columns=columns)
 
-def rolling_mean():
+def rolling_median():
 
     with open(dir_path + '/../data/csv_files/original.csv', 'r') as read_obj:
 
@@ -52,8 +52,8 @@ def rolling_mean():
         col = []
 
         for i in csv_reader:
-            rolling_windows = csv_reader[i].rolling(5)
-            col.append(rolling_windows.mean())
+            rolling_windows = csv_reader[i].rolling(3)
+            col.append(rolling_windows.median())
 
         a = list(zip(col[0], col[1], col[2],col[3],col[4],col[5],col[6],col[7],col[8],col[9],col[10],col[11],col[12],col[13],col[14],col[15],col[16],col[17],col[18],col[19],col[20],
                 col[21], col[22],col[23],col[24],col[25],col[26],col[27],col[28],col[29],col[30],col[31],col[32],col[33],col[34],col[35],col[36],col[37],col[38],col[39],col[40],
@@ -81,7 +81,7 @@ def rolling_mean():
 def create_csv(path_to_save=dir_path + '/../data/csv_files/'):
     a = json_to_csv() 
     a.to_csv(path_to_save + 'original.csv', index=False)
-    frame = rolling_mean()
+    frame = rolling_median()
     frame.to_csv(path_to_save + 'rolling_mean.csv', index=False)
 
 
