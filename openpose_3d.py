@@ -54,7 +54,10 @@ class OpenPose:
 
         self.knn = knn_classifier('data/training_data/occlusion_data.csv')
 
-    def record_estimation_sequence(self):
+        # Magic number
+        self.current_abs_depth = 1.5
+
+    def record_estimation_sequence(self, sequence=True):
         '''
         Will record a sequence of frames and for each frame estimate the poses in 3D.
 
@@ -68,6 +71,8 @@ class OpenPose:
             _, img = self.estimate_3d_picture(recording=True, frame_number=frame_number, img_name=img_name)
             cv2.imwrite(img_name, img)
             frame_number+=1
+            if sequence == False:
+                break
 
     def estimate_3d_picture(self, recording=False, frame_number=None, img_name=None, use_table_data=True):
         '''
@@ -87,7 +92,7 @@ class OpenPose:
 
         keypoints_depth = self.get_depth_from_camera(keypoints_2d, depth_data)
 
-        estimated_keypoints_3d = self.create_json(keypoints_2d, keypoints_depth, save=recording, frame_number=frame_number, img_name=img_name)
+        estimated_keypoints_3d = self.create_json(keypoints_2d, keypoints_depth, save=recording, frame_number=frame_number, img_name=img_name, use_table_data=use_table_data)
 
         return estimated_keypoints_3d, color_pic
 
@@ -124,9 +129,11 @@ class OpenPose:
                 current_best_dist = dist
                 ind = i
         
-        return self.depth_info[ind]
+        scalar = self.current_abs_depth/self.depth_info[ind][0]
+        adjusted_depth = scalar*self.depth_info[ind]
+        return adjusted_depth
 
-    def create_json(self, pose_keypoints, depth, save=False, img_name=None, frame_number=None):
+    def create_json(self, pose_keypoints, depth, save=False, img_name=None, frame_number=None, use_table_data=True):
         '''
         Will translate the data into more suitable data for printing. If save=true it will 
         save a json file with the keypoint information
@@ -139,7 +146,7 @@ class OpenPose:
             kp_list += kp_dict[str(ind)]
 
         kp_list = np.array(kp_list).reshape(1, -1)
-        if self.knn.predict(kp_list)[0]:
+        if self.knn.predict(kp_list)[0] and use_table_data:
             print('occlusion')
 
             depth = self.estimate_depth_from_table(depth)
@@ -147,6 +154,8 @@ class OpenPose:
             for ind, kp in enumerate(pose_keypoints):
                 kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
         else:
+            # Head depth + chest depth + crotch depth / 3
+            self.current_abs_depth = (kp_dict['0'][2] + kp_dict['1'][2] + kp_dict['8'][2])/3
             print('no occlusion')
          
         data = {}
@@ -164,4 +173,4 @@ class OpenPose:
 
 if __name__ == "__main__":
     op = OpenPose()
-    op.record_estimation_sequence()
+    op.record_estimation_sequence(False)

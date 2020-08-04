@@ -23,7 +23,7 @@ from csv_scripts.pose_from_csv import poses
 
 class GraphDrawer(pg.GraphicsWindow):
 
-    def __init__(self, from_file=False, path_to_csv=None):
+    def __init__(self, from_file, path_to_csv, img_path):
         '''
         Will initiate the graph and draw the first frame
         '''
@@ -35,6 +35,7 @@ class GraphDrawer(pg.GraphicsWindow):
         self.frame_number = 0
         self.from_file = from_file
         self.poses = poses(path_to_csv)
+        self.img_path = img_path
 
         if not self.from_file:
             try:
@@ -101,7 +102,7 @@ class GraphDrawer(pg.GraphicsWindow):
 
 
         # ------------------------------------------ Image printing ------------------------------------------
-        img = cv2.imread(dir_path + f'/../data/recorded_sequences/img{self.frame_number}.jpg')
+        img = cv2.imread(self.img_path + f'img{self.frame_number}.jpg')
               
         self.p1 = pg.ImageItem()
         self.p1.setImage(img)
@@ -125,7 +126,7 @@ class GraphDrawer(pg.GraphicsWindow):
     def update(self):
         self.frame_number +=1
 
-        img = cv2.imread(dir_path + f'/../data/recorded_sequences/img{self.frame_number}.jpg')
+        img = cv2.imread(self.img_path + f'img{self.frame_number}.jpg')
         self.p1.setImage(img)
 
         try: 
@@ -201,10 +202,12 @@ class GraphDrawer(pg.GraphicsWindow):
             self.op.vr.pipe.stop()
         sys.exit(0)
 
-def animation():
-    app = QtGui.QApplication(sys.argv) 
-    g = GraphDrawer(True, dir_path + '/../data/csv_files/rolling_mean.csv')
-    #g.start()
+def animation(demo=False, csv_path='/../data/csv_files/rolling_mean.csv', img_path='/../data/recorded_sequences/'):
+    app = QtGui.QApplication(sys.argv)
+    if demo:
+        csv_path = '/../data/demo/rolling_mean.csv'
+        img_path = '/../data/demo/'
+    g = GraphDrawer(True, dir_path + csv_path, dir_path + img_path)
     
     try:
         g.animation()
@@ -212,13 +215,12 @@ def animation():
         g.exit_program()
     
 
-if __name__ == "__main__":
+def one_pic():
     app = QtGui.QApplication(sys.argv) 
-    g = GraphDrawer(True, '../data/csv_files/rolling_mean.csv')
-    #g.start()
-    
-    try:
-        g.animation()
-    finally:
-        g.exit_program()
-    
+    g = GraphDrawer(True, dir_path + '/../data/csv_files/original.csv')
+    g.start()    
+
+
+
+if __name__ == "__main__":
+    one_pic()

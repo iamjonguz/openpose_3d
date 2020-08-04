@@ -7,9 +7,8 @@ Following commands are available...
 ...
 ...
 
-USE ARGPARSER TO DO THIS
 
-1. Run standard Openpose
+1. Run standard Openpose 
 2. Run live 3D-estimation
 3. Record video sequence & create pose data
 4. Create training data for KNN
@@ -21,13 +20,13 @@ USE ARGPARSER TO DO THIS
 
 import sys
 
-
 arg = sys.argv[1]
 print(arg)
 
 if arg == 'openpose_2d':
     import openpose_2d
-elif arg == 'openpose_3d':
+
+elif arg == 'openpose_3d_seq':
     from openpose_3d import OpenPose
     from csv_scripts.json_to_csv import create_csv
     from animation.pyqt import animation
@@ -35,11 +34,27 @@ elif arg == 'openpose_3d':
 
     try:
         op.record_estimation_sequence()
-    except:
+    except Exception as e:
+        print(e)
         print('Recording stopped.')
         create_csv()
         animation()
+
+elif arg == 'openpose_3d_pic':
+    from openpose_3d import OpenPose
+    from csv_scripts.json_to_csv import create_csv
+    from animation.pyqt import one_pic
+    op = OpenPose()
+
+    op.record_estimation_sequence(False)
+    create_csv()
+    one_pic()
+
 elif arg == 'animation':
     from animation.pyqt import animation
     animation()
 
+
+elif arg == 'demo':
+    from animation.pyqt import animation
+    animation(demo=True)
