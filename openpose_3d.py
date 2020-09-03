@@ -5,20 +5,21 @@ import cv2
 import os
 from sys import platform
 import argparse
-import json
 import numpy as np
-
 import time
+import pyrealsense2 as rs
+from os import listdir
+from os.path import isfile, join
+from mpl_toolkits import mplot3d
+
+import matplotlib.pyplot as plt
+
+from drawing.drawing import draw_keypoints
+
+from knn.k_nearest import create_knn
+
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-
-from cam import VideoRecorder
-
-from data.depth_table import create_depth_table
-
-from knn.k_nearest import knn_classifier
-
-
 
 if platform == "win32":
     # Change these variables to point to the correct folder (Release/x64 etc.)
@@ -33,7 +34,6 @@ class OpenPose:
 
     def __init__(self):
 
-        self.vr = VideoRecorder()
         # Custom Params (refer to include/openpose/flags.hpp for more parameters)
         params = dict()
         params["model_folder"] = "../../../models/"
@@ -49,128 +49,153 @@ class OpenPose:
         self.datum = op.Datum()
         self.opWrapper.start()
 
-        # Just loaded from code, need a better solution
-        self.depth_info = create_depth_table()
+        self.intrinsics = self.get_camera_intrinsics()
 
-        self.knn = knn_classifier('data/training_data/occlusion_data.csv')
+        self.pipeline = rs.pipeline()
+        self.config = rs.config() 
 
-        # Magic number
-        self.current_abs_depth = 1.5
+        self.knn = create_knn('knn/files_combined.npy')
 
-    def record_estimation_sequence(self, sequence=True):
-        '''
-        Will record a sequence of frames and for each frame estimate the poses in 3D.
 
-        Each frame will be saved as a picture together with a json file containing
-        information about keypoints. 
-        '''
-        frame_number = 0
+    def estimate_sequence(self):
+
+        self.profile = self.pipeline.start()
+
         time.sleep(3)
-        while True:
-            img_name = f'data/recorded_sequences/img{frame_number}.jpg'
-            _, img = self.estimate_3d_picture(recording=True, frame_number=frame_number, img_name=img_name)
-            cv2.imwrite(img_name, img)
-            frame_number+=1
-            if sequence == False:
-                break
 
-    def estimate_3d_picture(self, recording=False, frame_number=None, img_name=None, use_table_data=True):
-        '''
-        Will estimate the pose in 3D, by first estimating the 2D poses and then getting the 3D poses with the help 
-        of the 3D data from the 3D camera. 
+        final_keypoints = []
+        frame_number = 0
+        try:
+            while True:           
+                keypoints_3d = self.estimate_3d_picture(frame_number)
+                final_keypoints.append(keypoints_3d)
+                frame_number+=1
+        finally:      
+            with open('data/unprocessed/keypoints_unprocessed.npy', 'wb') as f1:
+                np.save(f1, final_keypoints) 
 
-        Returns the estimated 3D keypoints and the picture of the estimation. 
-        '''
 
-        # Picture taken from Intel Realsense Camera
-        color_pic, depth_data = self.vr.record_frame()
+    def estimate_3d_picture(self, frame_number):
+            '''
+            Will estimate the pose in 3D, by first estimating the 2D poses and then getting the 3D poses with the help 
+            of the 3D data from the 3D camera. 
+            '''
+
+            frames = self.pipeline.wait_for_frames()
+
+            depth_frame = frames.get_depth_frame()
+            color_image = np.asarray(frames.get_color_frame().get_data())
+
+            cv2.imwrite(f"data/unprocessed/images/original/image{frame_number}.jpg", color_image)
+
+            self.datum.cvInputData = color_image
+            self.opWrapper.emplaceAndPop([self.datum])
+            keypoints_2d = self.datum.poseKeypoints[0]
+            keypoints_2d = self.filter_keypoints(keypoints_2d)
+            keypoints_3d = self.get_depth_from_frame(keypoints_2d, depth_frame)
+            keypoints_3d = self.translate_to_camera_space(keypoints_3d)
+            keypoints_3d = self.make_hip_root(keypoints_3d)
+
+            if self.detect_occlusion(keypoints_3d):
+                text = 'Occlusion'
+                keypoints_3d.insert(0, [True,True,True])
+
+            else:
+                keypoints_3d.insert(0, [False,False,False])
+                text = 'No occlusion'
+
+            # ------------------------- Drawing ----------------------------
+            color_image = draw_keypoints(color_image, keypoints_2d, frame_number, text)
+
+            cv2.imshow('Frame', color_image)
         
-        self.datum.cvInputData = color_pic
-        self.opWrapper.emplaceAndPop([self.datum])
+            # Mark as training data. True = Occlusion, False = No occlusion
+            #keypoints_3d.insert(0, [False,False,False])
 
-        keypoints_2d = self.datum.poseKeypoints[0]
+            cv2.waitKey(1)
+            cv2.imwrite(f"data/unprocessed/images/keypoints/image{frame_number}.jpg", color_image)
+            return keypoints_3d
 
-        keypoints_depth = self.get_depth_from_camera(keypoints_2d, depth_data)
 
-        estimated_keypoints_3d = self.create_json(keypoints_2d, keypoints_depth, save=recording, frame_number=frame_number, img_name=img_name, use_table_data=use_table_data)
-
-        return estimated_keypoints_3d, color_pic
-
-    def get_depth_from_camera(self, kp, depth):
+    def filter_keypoints(self, keypoints_2d):
         '''
-        Will return the raw depth data from the camera.
-        ''' 
-        depth_list = []
-         
-        # Getting the depths of the estimated keypoints
-        for i, k in enumerate(kp):
-            dist = depth.get_distance(k[0], k[1]) 
-            depth_list.append(dist)
-
-        return depth_list
-
-    def estimate_depth_from_table(self, depth_list):
+        Filter keypoints from foot and head just leaving one keypoint for each of them.
         '''
-        Will from raw depth data pick the best depth frame from a table containg premade depth frames. 
+        filtered_kp = []
+        for i, kp in enumerate(keypoints_2d):
+            if i == 19 or i == 20 or i == 21 or i == 22 or i == 23 or i == 24 or i == 15 or i == 16 or i == 17 or i == 18 :
+                pass
+            else:
+                filtered_kp.append(kp)
 
-        It will compare each frame in the frame table with recorded depth frame, using euclidian distance. 
-        The frame from the table with the least distance to the recorded frame will be chosen. 
-        '''
+        return filtered_kp
 
-        current_best_dist = 0
-        ind = 0
 
-        for i,dl in enumerate(self.depth_info):
+    def get_depth_from_frame(self, keypoints_2d, depth_frame):
+        frame_with_depth = []
+        for kp in keypoints_2d:
+            try:
+                depth = depth_frame.get_distance(kp[0], kp[1])
+                a = [kp[0], kp[1], depth]
+                frame_with_depth.append(a)
+           
+            # Openpose estimates keypoints to be out of the picture
+            except IndexError:
+                frame_with_depth.append([0, 0, 0])
 
-            # Euclidian distance
-            dist = np.linalg.norm(np.array(depth_list)-np.array(dl))
 
-            if dist > current_best_dist:
-                current_best_dist = dist
-                ind = i
+        return frame_with_depth
+
+    def translate_to_camera_space(self, keypoints_3d):
         
-        scalar = self.current_abs_depth/self.depth_info[ind][0]
-        adjusted_depth = scalar*self.depth_info[ind]
-        return adjusted_depth
+        translated_keypoints = []
 
-    def create_json(self, pose_keypoints, depth, save=False, img_name=None, frame_number=None, use_table_data=True):
+        for kp in keypoints_3d:
+            translated_keypoints.append(rs.rs2_deproject_pixel_to_point(self.intrinsics, [kp[0], kp[1]], kp[2]))
+
+        return translated_keypoints
+
+
+    def make_hip_root(self, keypoints):      
+
+        root = keypoints[8] # hip
+
+        new_kp = []
+
+        for kp in keypoints:
+            tmp_x = kp[0] - root[0]
+            tmp_y = kp[1] - root[1]
+            tmp_z = kp[2] - root[2]
+        
+            new_kp.append([tmp_x, tmp_y, tmp_z])
+
+        return new_kp
+
+
+    def get_camera_intrinsics(self):
         '''
-        Will translate the data into more suitable data for printing. If save=true it will 
-        save a json file with the keypoint information
+        A way to get the camera intrinsics as an object to be used for 
+        translation to camera space. 
         '''
-        kp_dict = {}
-        kp_list = []
+        pipe = rs.pipeline()
+        profile = pipe.start()
+        frames = pipe.wait_for_frames()
+        depth_frame =  frames.get_depth_frame()
+        return depth_frame.profile.as_video_stream_profile().get_intrinsics()
 
-        for ind, kp in enumerate(pose_keypoints):
-            kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
-            kp_list += kp_dict[str(ind)]
+    
+    def detect_occlusion(self, frame_with_depth):
 
-        kp_list = np.array(kp_list).reshape(1, -1)
-        if self.knn.predict(kp_list)[0] and use_table_data:
-            print('occlusion')
+        flatten_list = []
+        for kp in frame_with_depth:
+            flatten_list += kp
 
-            depth = self.estimate_depth_from_table(depth)
-            
-            for ind, kp in enumerate(pose_keypoints):
-                kp_dict[str(ind)] = [kp[0].item(), kp[1].item(), depth[ind]]
-        else:
-            # Head depth + chest depth + crotch depth / 3
-            self.current_abs_depth = (kp_dict['0'][2] + kp_dict['1'][2] + kp_dict['8'][2])/3
-            print('no occlusion')
-         
-        data = {}
-
-        data['img_url'] = img_name
-        data['frame'] = frame_number
-        data['keypoints'] = kp_dict
-
-        if save:
-            with open(f'data/recorded_sequences/img{frame_number}.json', 'w', encoding='utf-8') as output:
-                json.dump(data, output, ensure_ascii=False, indent=4)
-
-        return data
+        flatten_list = np.array(flatten_list).reshape(1, -1)
+        occ = self.knn.predict(flatten_list)
+        return occ
 
 
 if __name__ == "__main__":
     op = OpenPose()
-    op.record_estimation_sequence(False)
+    op.estimate_sequence()
+
